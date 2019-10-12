@@ -1,0 +1,16 @@
+*------------------------------------------------------------
+Macro to Clean up work area.
+Deletes datasets, catalogs, formats and macros, Reset titles and footnotes and options.
+NOTE: to clean up specific catalog (any format or macro), you can use PROC CATALOG
+*------------------------------------------------------------;
+
+%MACRO cleanup;
+    goptions reset=all;
+    TITLE;
+    FOOTNOTE;
+
+    proc datasets lib=work nolist nowarn kill;
+    run;
+    quit;
+%Mend cleanup;
+
