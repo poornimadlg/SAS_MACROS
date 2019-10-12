@@ -1,0 +1,67 @@
+**Macro to merge main dataset to supp dataset;
+
+%macro merge_supp(domain=, inlib= );
+proc transpose data=&inlib..supp&domain out=supp_t(drop=_name_ _label_);
+     by studyid rdomain usubjid idvar idvarval;
+     var qval;
+     id qnam;
+     idlabel qlabel;
+     run;
+
+proc sql;
+     create table supplst as
+     select distinct studyid, rdomain, idvar, qnam, qlabel
+     from &inlib..supp&domain
+     order by studyid, rdomain, qnam;
+     quit;
+
+data _null_;
+     set supplst end=end;
+     by studyid rdomain qnam;
+     call symput ( 'qvnam'||strip(put(_n_,best.)), strip(qnam) );
+     call symput ( 'qlb'||strip(put(_n_,best.)), strip(qlabel) );
+     if end then do;
+        call symput ('rdm',  strip(compress(rdomain)) );
+        call symput ('link', strip(compress(idvar)) );
+        call symput ('qcnt', strip(put(_n_,best.)) );
+     end;
+     run;
+
+%put the value of rdm is &rdm;
+%put the value of link is &link;
+%put the value of qcnt is &qcnt;
+
+data supp_t2;
+     set supp_t(rename = (idvarval = &link.c rdomain=domain));
+     %if %upcase(&domain) ne DM %then %do;
+     &link = input(&link.c, best.);
+     %end;
+	 label
+     %do i = 1 %to &qcnt;
+     &&&qvnam&i = "&&&qlb&i"
+     %end;;
+	 drop &link.c;
+     run;
+
+proc sort data=supp_t2;
+     by studyid domain usubjid &link;
+     run;
+
+proc sort data=&inlib..&domain out=&domain;
+     by studyid domain usubjid &link;
+     run;
+
+data &domain.v chk;
+     merge &domain(in=pdm) supp_t2(in=supp);
+     by studyid domain usubjid &link;
+     if not pdm and supp then output chk;
+     if pdm then output &domain.v;
+     run;
+
+proc print data=chk;
+     title "SUPP&rdm records have no match record in parent domain &rdm";
+     run;
+title;
+
+%mend merge_supp;
+
